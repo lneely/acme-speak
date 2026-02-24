@@ -1,40 +1,55 @@
 # Speak
 
-Speech-to-text tool for the acme editor using whisper.cpp streaming.
+Real-time speech-to-text for the acme editor using whisper.cpp streaming.
+
+## Features
+
+- Real-time transcription as you speak
+- Toggle recording with a single click
+- Streams text directly to acme window
+- Uses whisper.cpp tiny model for fast inference
+- ~0.5-1 second latency
 
 ## Requirements
 
 - whisper.cpp with stream example built (https://github.com/ggml-org/whisper.cpp)
+- Go 1.21+
 - ALSA utils (for audio capture)
 - 9p tools for acme integration
 
 ## Installation
 
-1. Install whisper.cpp and build the stream example:
+1. Install and build whisper.cpp:
 ```bash
+git clone https://github.com/ggml-org/whisper.cpp
 cd whisper.cpp
 make stream
-# Install to PATH
+# Install whisper-stream to PATH
 cp build/bin/whisper-stream ~/bin/
 ```
 
-2. Download a model:
+2. Install Speak:
 ```bash
-cd whisper.cpp/models
-./download-ggml-model.sh tiny
-```
-
-3. Set WHISPER_MODEL environment variable or edit the Speak script
-
-4. Install Speak:
-```bash
-mk install
+git clone https://github.com/lneely/acme-speak
+cd acme-speak
+mk install  # Downloads tiny model and builds binary to ~/bin/Speak
 ```
 
 ## Usage
 
 From acme, add `Speak` to your window tag and click it:
-- First click: Start real-time transcription (streams text as you speak)
+- First click: Start real-time transcription
 - Second click: Stop transcription
 
-The script uses the `$winid` environment variable set by acme to write transcribed text to the current window in real-time.
+Text appears in the acme window as you speak.
+
+## Configuration
+
+Edit `main.go` to change:
+- Model: Change `modelPath` constant (tiny, base, small, etc.)
+- Latency/accuracy: Adjust `--step` and `--length` parameters
+  - Current: 500ms step, 5000ms context (good balance)
+  - Lower latency: 300ms step, 3000ms context (less accurate)
+  - Higher accuracy: 1000ms step, 8000ms context (more lag)
+
+Set `WHISPER_MODEL` environment variable to override model path.
