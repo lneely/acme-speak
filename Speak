@@ -3,17 +3,21 @@ set -e
 
 # Configure these paths for your whisper.cpp installation
 WHISPER_BIN="${WHISPER_BIN:-whisper-cli}"
-MODEL="${WHISPER_MODEL:-$HOME/src/acme-speak/models/ggml-base.en.bin}"
-STATE_FILE="/tmp/acme-voice-state-$$"
-AUDIO_FILE="/tmp/acme-voice-audio-$$.wav"
-LOG_FILE="/tmp/acme-voice-log-$$.txt"
+MODEL="${WHISPER_MODEL:-$HOME/src/acme-speak/models/ggml-base.bin}"
+STATE_FILE="/tmp/acme-voice-state"
+AUDIO_FILE="/tmp/acme-voice-audio.wav"
+LOG_FILE="/tmp/acme-voice-log.txt"
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG_FILE"
 }
 
 cleanup() {
-    rm -f "$STATE_FILE" "$AUDIO_FILE"
+    if [ -f "$STATE_FILE" ]; then
+        # Only cleanup if we're stopping, not starting
+        rm -f "$AUDIO_FILE"
+    fi
+    rm -f "$STATE_FILE"
     pkill -P $$ arecord 2>/dev/null || true
 }
 trap cleanup EXIT
@@ -30,6 +34,12 @@ if [ ! -f "$MODEL" ]; then
     log "ERROR: Model not found at $MODEL"
     echo "Error: Model not found at $MODEL" >&2
     echo "Set WHISPER_MODEL environment variable or download a model" >&2
+    exit 1
+fi
+
+if ! arecord -l >/dev/null 2>&1; then
+    log "ERROR: No audio devices found"
+    echo "Error: No audio devices found (arecord -l)" >&2
     exit 1
 fi
 
@@ -63,9 +73,23 @@ if [ -f "$STATE_FILE" ]; then
 else
     # Start recording
     log "Starting recording"
+    
+    # Test arecord first
+    if ! arecord -f cd -t wav -d 1 /dev/null 2>/tmp/arecord-test-$$.txt; then
+        log "ERROR: arecord test failed"
+        echo "Error: Cannot record audio - $(cat /tmp/arecord-test-$$.txt 2>/dev/null)" >&2
+        rm -f /tmp/arecord-test-$$.txt
+        exit 1
+    fi
+    rm -f /tmp/arecord-test-$$.txt
+    
     arecord -f cd -t wav "$AUDIO_FILE" >/dev/null 2>&1 &
-    echo $! > "$STATE_FILE"
-    log "Recording started (PID: $(cat "$STATE_FILE"))"
+    REC_PID=$!
+    echo $REC_PID > "$STATE_FILE"
+    log "Recording started (PID: $REC_PID)"
+    
+    # Disable cleanup trap so arecord continues after script exits
+    trap - EXIT
 fi
 
 log "Speak finished. Log: $LOG_FILE"
