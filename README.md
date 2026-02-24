@@ -21,7 +21,7 @@ cp build/bin/whisper-stream ~/bin/
 2. Download a model:
 ```bash
 cd whisper.cpp/models
-./download-ggml-model.sh base
+./download-ggml-model.sh tiny
 ```
 
 3. Set WHISPER_MODEL environment variable or edit the Speak script

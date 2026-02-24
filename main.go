@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"log"
@@ -16,15 +15,36 @@ import (
 )
 
 func readLines(r io.Reader, ch chan string) {
-	scanner := bufio.NewScanner(r)
-	for scanner.Scan() {
-		ch <- scanner.Text()
+	buf := make([]byte, 1)
+	line := ""
+	for {
+		n, err := r.Read(buf)
+		if n > 0 {
+			if buf[0] == '\n' {
+				// Newline = finalized output, send it
+				if line != "" {
+					ch <- line
+					line = ""
+				}
+			} else if buf[0] == '\r' {
+				// Carriage return = overwrite, keep accumulating
+				line = ""
+			} else {
+				line += string(buf[0])
+			}
+		}
+		if err != nil {
+			if line != "" {
+				ch <- line
+			}
+			break
+		}
 	}
 }
 
 const (
 	stateFile = "/tmp/acme-voice-state"
-	modelPath = "/home/lkn/src/acme-speak/models/ggml-base.bin"
+	modelPath = "/home/lkn/src/acme-speak/models/ggml-tiny.bin"
 )
 
 func main() {
@@ -48,7 +68,7 @@ func main() {
 		return
 	}
 
-	// Start new stream
+	// Start new stream - optimized for tiny model (faster, lower latency)
 	cmd := exec.Command("whisper-stream", "-m", modelPath, "-t", "4", "--step", "500", "--length", "5000")
 	
 	// Read from both stdout and stderr
@@ -102,21 +122,22 @@ func main() {
 		close(combined)
 	}()
 	
+	lastLine := ""
 	for line := range combined {
+		part := ansiRegex.ReplaceAllString(line, "")
+		part = strings.TrimSpace(part)
 		
-		// Also split on carriage return
-		for _, part := range strings.Split(line, "\r") {
-			part = ansiRegex.ReplaceAllString(part, "")
-			part = strings.TrimSpace(part)
-			
-			// Filter out debug/empty lines and hallucinations
-			if part == "" || strings.HasPrefix(part, "whisper_") ||
-				strings.HasPrefix(part, "main:") || strings.HasPrefix(part, "init:") ||
-				part == "[BLANK_AUDIO]" || part == "[Start speaking]" ||
-				strings.HasPrefix(part, "(") || strings.HasPrefix(part, "[Music]") {
-				continue
-			}
+		// Filter out debug/empty lines and hallucinations
+		if part == "" || strings.HasPrefix(part, "whisper_") ||
+			strings.HasPrefix(part, "main:") || strings.HasPrefix(part, "init:") ||
+			part == "[BLANK_AUDIO]" || part == "[Start speaking]" ||
+			strings.HasPrefix(part, "(") || strings.HasPrefix(part, "[Music]") {
+			continue
+		}
 
+		// Only write if different from last line
+		if part != lastLine {
+			lastLine = part
 			// Write to acme or stdout
 			if win != nil {
 				win.Write("body", []byte(part+" "))
