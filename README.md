@@ -52,4 +52,4 @@ Edit `main.go` to change:
   - Lower latency: 300ms step, 3000ms context (less accurate)
   - Higher accuracy: 1000ms step, 8000ms context (more lag)
 
-Set `WHISPER_MODEL` environment variable to override model path.
+Rebuild after changes: `go build -o ~/bin/Speak .`
