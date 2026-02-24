@@ -1,0 +1,71 @@
+#!/bin/bash
+set -e
+
+# Configure these paths for your whisper.cpp installation
+WHISPER_BIN="${WHISPER_BIN:-whisper-cli}"
+MODEL="${WHISPER_MODEL:-$HOME/src/acme-speak/models/ggml-base.en.bin}"
+STATE_FILE="/tmp/acme-voice-state-$$"
+AUDIO_FILE="/tmp/acme-voice-audio-$$.wav"
+LOG_FILE="/tmp/acme-voice-log-$$.txt"
+
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG_FILE"
+}
+
+cleanup() {
+    rm -f "$STATE_FILE" "$AUDIO_FILE"
+    pkill -P $$ arecord 2>/dev/null || true
+}
+trap cleanup EXIT
+
+log "Starting Speak (PID: $$, winid: ${winid:-none})"
+
+if ! command -v "$WHISPER_BIN" >/dev/null 2>&1; then
+    log "ERROR: $WHISPER_BIN not found in PATH"
+    echo "Error: $WHISPER_BIN not found in PATH" >&2
+    exit 1
+fi
+
+if [ ! -f "$MODEL" ]; then
+    log "ERROR: Model not found at $MODEL"
+    echo "Error: Model not found at $MODEL" >&2
+    echo "Set WHISPER_MODEL environment variable or download a model" >&2
+    exit 1
+fi
+
+if [ -f "$STATE_FILE" ]; then
+    # Stop recording
+    log "Stopping recording"
+    PID=$(cat "$STATE_FILE")
+    kill "$PID" 2>/dev/null || true
+    wait "$PID" 2>/dev/null || true
+    rm -f "$STATE_FILE"
+    
+    # Transcribe
+    if [ -f "$AUDIO_FILE" ]; then
+        log "Transcribing audio file"
+        TEXT=$("$WHISPER_BIN" -m "$MODEL" -f "$AUDIO_FILE" -nt -t 4 2>&1 | grep -E '^\[' | sed 's/^\[[^]]*\] *//' | tr '\n' ' ')
+        log "Transcription result: $TEXT"
+        
+        # Write to acme window
+        if [ -n "$winid" ]; then
+            log "Writing to acme window $winid"
+            echo -n "$TEXT" | 9p write acme/$winid/body
+        else
+            log "No winid, printing to stdout"
+            echo "$TEXT"
+        fi
+        
+        rm -f "$AUDIO_FILE"
+    else
+        log "ERROR: Audio file not found"
+    fi
+else
+    # Start recording
+    log "Starting recording"
+    arecord -f cd -t wav "$AUDIO_FILE" >/dev/null 2>&1 &
+    echo $! > "$STATE_FILE"
+    log "Recording started (PID: $(cat "$STATE_FILE"))"
+fi
+
+log "Speak finished. Log: $LOG_FILE"
