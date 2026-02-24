@@ -8,7 +8,7 @@ Real-time speech-to-text for the acme editor using whisper.cpp streaming.
 - Toggle recording with a single click
 - Streams text directly to acme window
 - Uses whisper.cpp tiny model for fast inference
-- ~0.5-1 second latency
+- Latency varies by CPU speed (typically a few seconds)
 
 ## Requirements
 
