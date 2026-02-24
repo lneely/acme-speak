@@ -1,32 +1,40 @@
 # Speak
 
-Speech-to-text tool for the acme editor using whisper.cpp.
+Speech-to-text tool for the acme editor using whisper.cpp streaming.
 
 ## Requirements
 
-- whisper.cpp (https://github.com/ggml-org/whisper.cpp)
-- arecord (ALSA utils)
+- whisper.cpp with stream example built (https://github.com/ggml-org/whisper.cpp)
+- ALSA utils (for audio capture)
 - 9p tools for acme integration
 
 ## Installation
 
-1. Install whisper.cpp and download a model (e.g., base.en)
-
-2. Edit the `Speak` script to set paths:
+1. Install whisper.cpp and build the stream example:
 ```bash
-WHISPER_DIR="/path/to/whisper.cpp"
-MODEL="$WHISPER_DIR/models/ggml-base.en.bin"
+cd whisper.cpp
+make stream
+# Install to PATH
+cp build/bin/whisper-stream ~/bin/
 ```
 
-3. Make script executable:
+2. Download a model:
 ```bash
-chmod +x Speak
+cd whisper.cpp/models
+./download-ggml-model.sh base
+```
+
+3. Set WHISPER_MODEL environment variable or edit the Speak script
+
+4. Install Speak:
+```bash
+mk install
 ```
 
 ## Usage
 
 From acme, add `Speak` to your window tag and click it:
-- First click: Start recording
-- Second click: Stop recording and transcribe to current window
+- First click: Start real-time transcription (streams text as you speak)
+- Second click: Stop transcription
 
-The script uses the `$winid` environment variable set by acme to write transcribed text to the current window.
+The script uses the `$winid` environment variable set by acme to write transcribed text to the current window in real-time.
